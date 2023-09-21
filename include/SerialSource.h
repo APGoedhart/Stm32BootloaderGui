@@ -47,6 +47,13 @@ class SerialSource : public QObject
      */
     void closePort();
 
+    /**
+     * Clear any send or receive queues.
+     * @brief clearQueues
+     */
+    void clearQueues();
+
+
 
   private slots:
     /**
@@ -66,6 +73,7 @@ class SerialSource : public QObject
 
     void poll();
 
+
  signals:
     /**
      * notify the channel that is waiting that we have received a
@@ -83,6 +91,8 @@ class SerialSource : public QObject
      */
     void closed();
 
+
+
   private:
     /**
      * Send the next packet of data in the queue if we have finished trransmitting the last one.
@@ -90,11 +100,7 @@ class SerialSource : public QObject
      */
     void sendIfTxComplete();
 
-    /**
-     * Clear any send or receive queues.
-     * @brief clearQueues
-     */
-    void clearQueues();
+
 
 
 

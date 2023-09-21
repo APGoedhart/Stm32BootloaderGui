@@ -30,6 +30,8 @@ public slots:
       void txData(const QByteArray &packet);
       void scheduleTimeout(int milliseconds);
       void stopTimer();
+      void resetSerialPort();
+      void clearQueues();
       void dtr(bool isEnabled);
       void rts(bool isEnabled);
 

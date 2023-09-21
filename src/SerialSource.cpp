@@ -12,7 +12,7 @@ SerialSource::SerialSource(QObject *parent) :
   connect(_serialPort, &QSerialPort::bytesWritten, this, &SerialSource::bytesWritten);
   connect(_serialPort, &QSerialPort::errorOccurred, this, &SerialSource::errorOccured);
   connect(_retry, &QTimer::timeout, this, &SerialSource::poll);
-  _retry->start(200);
+  _retry->start(50);
 }
 
 
@@ -60,7 +60,7 @@ void SerialSource::openPort(const QString &portName, int baudRate ){
   _serialPort->setFlowControl(QSerialPort::NoFlowControl);
   _serialPort->setStopBits(QSerialPort::OneStop);
   if( _serialPort->open(QIODevice::ReadWrite) ){
-     dtr(false);
+     dtr(true);
      rts(false);
     emit opened();
   } else {
@@ -93,7 +93,6 @@ void SerialSource::poll(){
 
 void SerialSource::readyRead(){
   if( _serialPort->bytesAvailable()){
-    _serialPort->setDataTerminalReady(true);
     auto data = _serialPort->readAll();
     emit rxData(data);
   }
@@ -105,7 +104,12 @@ void SerialSource::readyRead(){
  * @param error
  */
 void SerialSource::errorOccured(QSerialPort::SerialPortError){
-  closePort();
+  if( _serialPort->isOpen()) {
+    auto baud = getBaudRate();
+    auto port = getPort();
+    closePort();
+    openPort(port, baud);
+  }
 }
 
 /**

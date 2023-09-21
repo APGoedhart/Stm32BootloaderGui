@@ -18,10 +18,13 @@ class Command {
     QList<StepPtr> _steps;
     CommandSequence *_owner;
     int _currentStep;
+    int retries;
+    int maxRetries;
 
 public:
     Command();
     Command(QString name);
+    Command(QString name, uint32_t retriesAllowed);
 
     QString name();
     void setOwner(CommandSequence *owner);
@@ -38,15 +41,19 @@ public:
 
     // notifications from steps
     void stepComplete();
-    void stepFailed();
+    virtual void stepFailed();
 
     // factory methods
-    static CmdPtr resetIntoBootLoader(CommandSequence *seq);
+    static CmdPtr resetIntoCustomBootLoader(CommandSequence *seq);
+    static CmdPtr resetIntoChipBootLoader(CommandSequence *seq);
     static CmdPtr resetIntoRunMode(CommandSequence *seq);
     static CmdPtr syncBaud();
+    static CmdPtr enableDebug(CommandSequence *seq);
+    static CmdPtr bootloadSlave(CommandSequence *seq);
     static CmdPtr eraseFlash();
     static CmdPtr writeData(uint32_t address, const QByteArray &dataPage);
     static CmdPtr verifyData(uint32_t address, const QByteArray &dataPage);
+    static CmdPtr programCrc();
 
     void executeNextStep();
 };

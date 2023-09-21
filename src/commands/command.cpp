@@ -6,13 +6,27 @@ Command::Command():
     _name("Not Set"),
     _steps(),
     _owner(nullptr),
-    _currentStep(0){
+    _currentStep(0),
+    retries(0),
+    maxRetries(3){
 }
+
 Command::Command(QString name):
     _name(name),
     _steps(),
     _owner(nullptr),
-    _currentStep(0){
+    _currentStep(0),
+    retries(0),
+    maxRetries(3){
+}
+
+Command::Command(QString name, uint32_t retriesAllowed ):
+    _name(name),
+    _steps(),
+    _owner(nullptr),
+    _currentStep(0),
+    retries(0),
+    maxRetries(retriesAllowed){
 }
 
 QString Command::name(){
@@ -72,50 +86,92 @@ void Command::stepComplete(){
   executeNextStep();
 }
 
-void Command::stepFailed(){
-  if( _owner != nullptr){
-    _owner->CommandFailed();
+void Command::stepFailed() {
+  if (retries < maxRetries){
+    retries++;
+    _owner->clearQueues();
+    _currentStep = 0;
+    executeNextStep();
+  } else{
+    if( _owner != nullptr){
+      _owner->CommandFailed();
+    }
   }
 }
 
+/// @brief toggle the reset lines to reset the device. The boot lines are kept low to boot into the custom boot loader
+/// @details RTS = reset
+///          DTR = boot0
+///
+Command::CmdPtr Command::resetIntoCustomBootLoader(CommandSequence *seq){
+  auto pullResetLow = [seq](Command *){
+      seq->dtr(true);
+      seq->rts(true);
+  };
+  auto pullResetHigh = [seq](Command *){
+      seq->dtr(true);
+      seq->rts(false);
+  };
 
+  auto cmd = std::make_shared<Command>("Reset into Bootloader");
+  cmd->addStep(CommandStep::timedStep(pullResetHigh, 500));
+  cmd->addStep(CommandStep::timedStep(pullResetLow, 500));
+  cmd->addStep(CommandStep::timedStep(pullResetHigh, 500));
+  return cmd;
+}
 
-Command::CmdPtr Command::resetIntoBootLoader(CommandSequence *seq){
-    auto pullBootPinHighResetHigh = [seq](Command *){
+/// @brief toggle the reset lines to reset the device. The boot lines are set high to boot into the chips boot loader
+///
+/// @details RTS = reset
+///          DTR = boot0
+///
+Command::CmdPtr Command::resetIntoChipBootLoader(CommandSequence *seq){
+  auto pullResetLowBootHigh = [seq](Command *){
       seq->dtr(false);
       seq->rts(true);
-    };
-    auto pullResetLow = [seq](Command *){
+  };
+  auto pullResetHighBootHigh = [seq](Command *){
       seq->dtr(false);
-    };
-    auto pullResetHigh = [seq](Command *){
-      seq->dtr(true);
-    };
+      seq->rts(false);
+  };
 
 
   auto cmd = std::make_shared<Command>("Reset into Bootloader");
-  cmd->addStep(CommandStep::timedStep(pullBootPinHighResetHigh, 500));
-  cmd->addStep(CommandStep::timedStep(pullResetLow, 500));
-  cmd->addStep(CommandStep::timedStep(pullResetHigh, 500));
+  cmd->addStep(CommandStep::timedStep(pullResetLowBootHigh, 500));
+  cmd->addStep(CommandStep::timedStep(pullResetHighBootHigh, 500));
   return cmd;
 }
 
 
 Command::CmdPtr Command::resetIntoRunMode(CommandSequence *seq){
     auto pullBootPinLow = [seq](Command *){
-      seq->rts(false);
+      seq->dtr(true);
     };
     auto pullResetLow = [seq](Command *){
-      seq->dtr(false);
+      seq->rts(true);
     };
     auto pullResetHigh = [seq](Command *){
-      seq->dtr(true);
+      seq->rts(false);
     };
 
   auto cmd = std::make_shared<Command>("Reset into Run");
-  cmd->addStep(CommandStep::timedStep(pullResetLow, 1000));
   cmd->addStep(CommandStep::timedStep(pullBootPinLow, 1000));
+  cmd->addStep(CommandStep::timedStep(pullResetLow, 1000));
   cmd->addStep(CommandStep::timedStep(pullResetHigh, 1000));
+  return cmd;
+}
+
+
+Command::CmdPtr Command::enableDebug(CommandSequence *seq){
+  auto cmd = std::make_shared<Command>("Enable Debug");
+  cmd->addStep(CommandStep::txCmd(0xA3));
+  return cmd;
+}
+
+
+Command::CmdPtr Command::bootloadSlave(CommandSequence *seq){
+  auto cmd = std::make_shared<Command>("Bootload Slave ....");
+  cmd->addStep(CommandStep::txCmd(0xA4));
   return cmd;
 }
 
@@ -160,5 +216,12 @@ Command::CmdPtr Command::verifyData(uint32_t address, const QByteArray &dataPage
   cmd->addStep(CommandStep::txCmd(0x11));
   cmd->addStep(CommandStep::txFixedData(addr));
   cmd->addStep(std::make_shared<RxVerifyData>(dataPage));
+  return cmd;
+}
+
+
+Command::CmdPtr Command::programCrc(){
+  auto cmd = std::make_shared<Command>("ProgramCrc ......");
+  cmd->addStep(CommandStep::txCmd(0xA2));
   return cmd;
 }
